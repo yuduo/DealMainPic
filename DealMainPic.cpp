@@ -406,117 +406,11 @@ int getFrameByName(std::string sFileName)
 	cout << "duration video:" << sExeTranYuv << endl;
 	return atoi((char*)exec(sExeTranYuv.c_str()).c_str());
 }
-void SingleOnePic(VEDIOWARN *pVideoWarn, std::string fileInputName,int index, int total,int iWarnType, void *pHandle, PVDAnalyseProcess g_VDAnalyseProcess)
+void SingleOnePic(VEDIOWARN *pVideoWarn, std::string fileInputName,int index, int total,int iWarnType, void *pHandle)
 {
 	int iWidth = pVideoWarn->iFrameWidth;
 	int iHeight = pVideoWarn->iFrameHeight;
-	//分析一帧图像
-
-
-	unsigned char *YUV1 = NULL;
-	YUV1 = new unsigned char[iWidth * iHeight * 3 / 2];
-	int bufLen = iWidth * iHeight * 3 / 2;
-	FILE* pFileIn;
-
-	if ((pFileIn = fopen(fileInputName.c_str(), "rb")) == NULL) //if((pFileIn=fopen(fileInputName,"rb"))==NULL)
-	{
-		cout << "YUV文件打开失败！";
-		//DeleteFile
-		/*for (int m = 1; m<7; m++)
-		{
-		char fileName[200] = { 0 };
-		std::string strXmlName = GetXmlName(m);
-		sprintf(fileName, ("%s/%s_%s.txt"), g_uploadPath.c_str(), pVideoWarn->sYwid.c_str(), strXmlName.c_str());
-		remove(fileName);
-
-		}*/
-		//char fileInputName[200] = {0};
-		//sprintf(fileInputName, ("%s/%s.yuv"),g_uploadPath.c_str(),pVideoWarn->sYwid.c_str());
-		//remove(fileInputName.c_str());
-
-	}
-	else {
-		printf("fopen.\n");
-	}
-
-	u32 dwTimeStamp = 0;
-	printf("pVideoWarn->sFileName= %s pVideoWarn->iFrameCount= %d.\n", pVideoWarn->sFileName.c_str(), pVideoWarn->iFrameCount);
-	//int div = getFrameByName(pVideoWarn->sFileName)/total;
-	int div = pVideoWarn->iFrameCount*pVideoWarn->iFrameDelay / total;
-	int start = div * index;
-	int end = 0;
-	if (div*(index + 1) > pVideoWarn->iFrameCount*pVideoWarn->iFrameDelay)
-	{
-		end = pVideoWarn->iFrameCount*pVideoWarn->iFrameDelay;
-	}
-	else
-	{
-		end = div * (index + 1);
-	}
-	char sstart[10] = { 0 }; char send[10] = { 0 };
-	sprintf(sstart, "%d", start);
-	sprintf(send, "%d", end);
-	cout << "start:" << sstart << endl;
-	cout << "end:" << send << endl;
-	for (int i = start; i<end; i++)
-	{
-
-		TAnalyseInput struAnalyseInput = { 0 };
-		TAnalyseOutput struAnalyseOutput = { 0 };
-		dwTimeStamp += pVideoWarn->iFrameDelay;
-		struAnalyseInput.u64TimeStamp = dwTimeStamp;
-
-		fread(YUV1, bufLen * sizeof(unsigned char), 1, pFileIn);
-		TImage tempImage = { 0 };
-		tempImage.u32Type = AI_I420;
-		tempImage.atPlane[0].l32Width = iWidth;
-		tempImage.atPlane[0].l32Height = iHeight;
-		tempImage.atPlane[0].l32Stride = iWidth;
-		tempImage.atPlane[0].pvBuffer = YUV1;
-
-		tempImage.atPlane[1].l32Width = iWidth >> 1;
-		tempImage.atPlane[1].l32Height = iHeight >> 1;
-		tempImage.atPlane[1].l32Stride = iWidth >> 1;
-		tempImage.atPlane[1].pvBuffer = YUV1 + iWidth * iHeight;
-
-		tempImage.atPlane[2].l32Width = iWidth >> 1;
-		tempImage.atPlane[2].l32Height = iHeight >> 1;
-		tempImage.atPlane[2].l32Stride = iWidth >> 1;
-		tempImage.atPlane[2].pvBuffer = YUV1 + iWidth * iHeight * 5 / 4;
-		struAnalyseInput.tImgIn = tempImage;
-
-		
-
-			long iOk = g_VDAnalyseProcess(pHandle, &struAnalyseInput, &struAnalyseOutput);
-			if (iOk == 0)
-			{
-				if (struAnalyseOutput.u32RstNum)
-				{
-					//u32RstNum 大于0就是有报警
-					printf("pAnalyseOutput alert!(Frame:%d,WarnType:%d).\n", i, iWarnType);
-					/*
-					for(int j=0;j < MAX_RESULT_NUM;j++)
-					{
-					printf("dwTimeStamp = .\n",struAnalyseOutput.atRstData[j].u64TimeStamp);
-					}
-					*/
-					InsertWarnInfo(pVideoWarn->sYwid, iWarnType, i, pVideoWarn->iFrameDelay);
-
-				}
-				else
-				{
-					//printf("pAnalyseOutput struAnalyseOutput.u32RstNum = %d.\n",struAnalyseOutput.u32RstNum);
-				}
-
-			}
-			else
-			{
-				printf("*VDAnalyseProcess Error (%ld).\n", iOk);
-			}
-		
-	}
-	delete[] YUV1;
-	YUV1 = NULL;
+	
 }
 int dectectVideo(VEDIOWARN *pVideoWarn,std::string fileInputName,int total)
 {
@@ -595,9 +489,120 @@ int dectectVideo(VEDIOWARN *pVideoWarn,std::string fileInputName,int total)
 		{
 			printf("VDAnalyseProcess.\n");
 		}
-		for(int i =0;i<total;i++)
-			SingleOnePic(pVideoWarn, fileInputName,i, total, iWarnType, pHandle, g_VDAnalyseProcess);
+		for (int index = 0; index < total; index++) {
+			char name[50];
+			sprintf(name, "%s/%s_%d.%s", g_uploadPath.c_str(), pVideoWarn->sYwid.c_str(), index, "yuv");
+			cout << "name:" << name << endl;
+			
+			//分析一帧图像
 
+
+			unsigned char *YUV1 = NULL;
+			YUV1 = new unsigned char[iWidth * iHeight * 3 / 2];
+			int bufLen = iWidth * iHeight * 3 / 2;
+			FILE* pFileIn;
+
+			if ((pFileIn = fopen(fileInputName.c_str(), "rb")) == NULL) //if((pFileIn=fopen(fileInputName,"rb"))==NULL)
+			{
+				cout << "YUV文件打开失败！";
+				//DeleteFile
+				/*for (int m = 1; m<7; m++)
+				{
+				char fileName[200] = { 0 };
+				std::string strXmlName = GetXmlName(m);
+				sprintf(fileName, ("%s/%s_%s.txt"), g_uploadPath.c_str(), pVideoWarn->sYwid.c_str(), strXmlName.c_str());
+				remove(fileName);
+
+				}*/
+				//char fileInputName[200] = {0};
+				//sprintf(fileInputName, ("%s/%s.yuv"),g_uploadPath.c_str(),pVideoWarn->sYwid.c_str());
+				//remove(fileInputName.c_str());
+
+			}
+			else {
+				printf("fopen.\n");
+			}
+
+			u32 dwTimeStamp = 0;
+			printf("pVideoWarn->sFileName= %s pVideoWarn->iFrameCount= %d.\n", pVideoWarn->sFileName.c_str(), pVideoWarn->iFrameCount);
+			//int div = getFrameByName(pVideoWarn->sFileName)/total;
+			int div = pVideoWarn->iFrameCount*pVideoWarn->iFrameDelay / total;
+			int start = div * index;
+			int end = 0;
+			if (div*(index + 1) > pVideoWarn->iFrameCount*pVideoWarn->iFrameDelay)
+			{
+				end = pVideoWarn->iFrameCount*pVideoWarn->iFrameDelay;
+			}
+			else
+			{
+				end = div * (index + 1);
+			}
+			char sstart[10] = { 0 }; char send[10] = { 0 };
+			sprintf(sstart, "%d", start);
+			sprintf(send, "%d", end);
+			cout << "start:" << sstart << endl;
+			cout << "end:" << send << endl;
+			for (int i = start; i<end; i++)
+			{
+
+				TAnalyseInput struAnalyseInput = { 0 };
+				TAnalyseOutput struAnalyseOutput = { 0 };
+				dwTimeStamp += pVideoWarn->iFrameDelay;
+				struAnalyseInput.u64TimeStamp = dwTimeStamp;
+
+				fread(YUV1, bufLen * sizeof(unsigned char), 1, pFileIn);
+				TImage tempImage = { 0 };
+				tempImage.u32Type = AI_I420;
+				tempImage.atPlane[0].l32Width = iWidth;
+				tempImage.atPlane[0].l32Height = iHeight;
+				tempImage.atPlane[0].l32Stride = iWidth;
+				tempImage.atPlane[0].pvBuffer = YUV1;
+
+				tempImage.atPlane[1].l32Width = iWidth >> 1;
+				tempImage.atPlane[1].l32Height = iHeight >> 1;
+				tempImage.atPlane[1].l32Stride = iWidth >> 1;
+				tempImage.atPlane[1].pvBuffer = YUV1 + iWidth * iHeight;
+
+				tempImage.atPlane[2].l32Width = iWidth >> 1;
+				tempImage.atPlane[2].l32Height = iHeight >> 1;
+				tempImage.atPlane[2].l32Stride = iWidth >> 1;
+				tempImage.atPlane[2].pvBuffer = YUV1 + iWidth * iHeight * 5 / 4;
+				struAnalyseInput.tImgIn = tempImage;
+
+
+
+				long iOk = g_VDAnalyseProcess(pHandle, &struAnalyseInput, &struAnalyseOutput);
+				cout << "OK:" << iOk << endl;
+				if (iOk == 0)
+				{
+					if (struAnalyseOutput.u32RstNum)
+					{
+						//u32RstNum 大于0就是有报警
+						printf("pAnalyseOutput alert!(Frame:%d,WarnType:%d).\n", i, iWarnType);
+						/*
+						for(int j=0;j < MAX_RESULT_NUM;j++)
+						{
+						printf("dwTimeStamp = .\n",struAnalyseOutput.atRstData[j].u64TimeStamp);
+						}
+						*/
+						InsertWarnInfo(pVideoWarn->sYwid, iWarnType, i, pVideoWarn->iFrameDelay);
+
+					}
+					else
+					{
+						//printf("pAnalyseOutput struAnalyseOutput.u32RstNum = %d.\n",struAnalyseOutput.u32RstNum);
+					}
+
+				}
+				else
+				{
+					printf("*VDAnalyseProcess Error (%ld).\n", iOk);
+				}
+
+			}
+			delete[] YUV1;
+			YUV1 = NULL;
+		}
 		g_VDAnalyseClose = (PVDAnalyseClose)dlsym(handle, "VDAnalyseClose");
 		szError = dlerror();
 		if (szError != NULL)
@@ -656,7 +661,8 @@ int DealVedio()
 		UpdateVedioWarnInfo(&tempVedioWarn);
 
 		int duration = getVideoDuration(&tempVedioWarn);
-		int count = duration / 10;
+		int cut = 5;
+		int count = duration / cut;
 		char scount[10] = { 0 }; char sdur[10] = { 0 };
 		sprintf(sdur, "%d", duration);
 		sprintf(scount, "%d", count);
@@ -666,9 +672,9 @@ int DealVedio()
 		{
 			char name[100];
 			if(i==count)
-				SplitVideo(&tempVedioWarn, i * 10, duration-i*10, i);
+				SplitVideo(&tempVedioWarn, i * cut, duration-i*cut, i);
 			else
-				SplitVideo(&tempVedioWarn,i*10,10,i);
+				SplitVideo(&tempVedioWarn,i*cut,cut,i);
 			sprintf(name, "%s_%d.%s", tempVedioWarn.sYwid.c_str(), i, getSplit(tempVedioWarn.sFileName.c_str(),1).c_str());
 			cout << "convert yuv:" << name << endl;
 			ConvertToYUV(name);
