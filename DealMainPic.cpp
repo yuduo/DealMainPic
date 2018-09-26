@@ -417,20 +417,47 @@ int dectectVideo(VEDIOWARN *pVideoWarn,std::string fileInputName,int total)
 	int iWidth = pVideoWarn->iFrameWidth;
 	int iHeight = pVideoWarn->iFrameHeight;
 	void* handle = dlopen("./libivsctrl_x86_linux.so", RTLD_LAZY);
+	PVDAnalyseOpen g_VDAnalyseOpen = NULL;
+	PVDAnalyseProcess g_VDAnalyseProcess = NULL;
 	if (!handle)
 	{
 		printf("ERROR, Message(%s).\n", dlerror());
 		return -1;
 	}
 
+	//创建一个分析模块
+	g_VDAnalyseOpen = (PVDAnalyseOpen)dlsym(handle, "VDAnalyseOpen");
+	char* szError = dlerror();
+	if (szError != NULL)
+	{
+		printf("ERROR, Message(%s).\n", szError);
+		dlclose(handle);
+		return -1;
+		
+	}
+	
+	//获得分析处理函数
+
+	g_VDAnalyseProcess = (PVDAnalyseProcess)dlsym(handle, "VDAnalyseProcess");
+	szError = dlerror();
+	if (szError != NULL)
+	{
+		printf("ERROR, Message(%s).\n", szError);
+		dlclose(handle);
+		return -1;
+		
+	}
+	else
+	{
+		printf("VDAnalyseProcess.\n");
+	}
 	for (int iWarnType = 1; iWarnType<6; iWarnType++)
 	{
 
 		TAnalyseParam struAnalyseParam;
 		memset(&struAnalyseParam, 0, sizeof(TAnalyseParam));
 		struAnalyseParam.ps8ParamData = new char[8000];
-		PVDAnalyseOpen g_VDAnalyseOpen = NULL;
-		PVDAnalyseProcess g_VDAnalyseProcess = NULL;
+
 		PVDAnalyseClose g_VDAnalyseClose = NULL;
 		void *pHandle = NULL;
 		FILE *fp;
@@ -448,54 +475,30 @@ int dectectVideo(VEDIOWARN *pVideoWarn,std::string fileInputName,int total)
 
 		buf = new char[8000];
 		fread(buf, 1, 8000, fp);
+		fclose(fp);
 
 		strcpy(struAnalyseParam.ps8ParamData, buf);
 		struAnalyseParam.u32ParamLen = strlen(buf);
 
-
-		//创建一个分析模块
-		g_VDAnalyseOpen = (PVDAnalyseOpen)dlsym(handle, "VDAnalyseOpen");
-		char* szError = dlerror();
-		if (szError != NULL)
-		{
-			printf("ERROR, Message(%s).\n", szError);
-			dlclose(handle);
-			//return -1;
-			continue;
-		}
 		if (g_VDAnalyseOpen != NULL)
 		{
 			int iOk = g_VDAnalyseOpen(&pHandle, &struAnalyseParam);
-		}
-		if (pHandle == NULL)
-		{
-			printf("g_VDAnalyseOpen(&pHandle,&struAnalyseParam) : pHandle is null.\n");
 
-			continue;
+			if (pHandle == NULL)
+			{
+				printf("g_VDAnalyseOpen(&pHandle,&struAnalyseParam) : pHandle is null.\n");
+				
+				continue;
+			}
 		}
-
-		//获得分析处理函数
-
-		g_VDAnalyseProcess = (PVDAnalyseProcess)dlsym(handle, "VDAnalyseProcess");
-		szError = dlerror();
-		if (szError != NULL)
-		{
-			printf("ERROR, Message(%s).\n", szError);
-			dlclose(handle);
-			//return -1;
-			continue;
-		}
-		else
-		{
-			printf("VDAnalyseProcess.\n");
-		}
+		
 		for (int index = 0; index < total; index++) {
 			char name[50];
 			sprintf(name, "%s/%s_%d.%s", g_uploadPath.c_str(), pVideoWarn->sYwid.c_str(), index, "yuv");
 			cout << "name:" << name << endl;
 			
 			//分析一帧图像
-
+			fileInputName = name;
 
 			unsigned char *YUV1 = NULL;
 			YUV1 = new unsigned char[iWidth * iHeight * 3 / 2];
@@ -505,6 +508,7 @@ int dectectVideo(VEDIOWARN *pVideoWarn,std::string fileInputName,int total)
 			if ((pFileIn = fopen(fileInputName.c_str(), "rb")) == NULL) //if((pFileIn=fopen(fileInputName,"rb"))==NULL)
 			{
 				cout << "YUV文件打开失败！";
+				continue;
 				//DeleteFile
 				/*for (int m = 1; m<7; m++)
 				{
@@ -547,7 +551,7 @@ int dectectVideo(VEDIOWARN *pVideoWarn,std::string fileInputName,int total)
 
 				TAnalyseInput struAnalyseInput = { 0 };
 				TAnalyseOutput struAnalyseOutput = { 0 };
-				dwTimeStamp += pVideoWarn->iFrameDelay;
+				dwTimeStamp++;// = pVideoWarn->iFrameDelay;
 				struAnalyseInput.u64TimeStamp = dwTimeStamp;
 
 				fread(YUV1, bufLen * sizeof(unsigned char), 1, pFileIn);
@@ -572,7 +576,7 @@ int dectectVideo(VEDIOWARN *pVideoWarn,std::string fileInputName,int total)
 
 
 				long iOk = g_VDAnalyseProcess(pHandle, &struAnalyseInput, &struAnalyseOutput);
-				cout << "OK:" << iOk << endl;
+				
 				if (iOk == 0)
 				{
 					if (struAnalyseOutput.u32RstNum)
@@ -600,9 +604,12 @@ int dectectVideo(VEDIOWARN *pVideoWarn,std::string fileInputName,int total)
 				}
 
 			}
+			fclose(pFileIn);
 			delete[] YUV1;
 			YUV1 = NULL;
 		}
+		
+
 		g_VDAnalyseClose = (PVDAnalyseClose)dlsym(handle, "VDAnalyseClose");
 		szError = dlerror();
 		if (szError != NULL)
@@ -661,7 +668,7 @@ int DealVedio()
 		UpdateVedioWarnInfo(&tempVedioWarn);
 
 		int duration = getVideoDuration(&tempVedioWarn);
-		int cut = 5;
+		int cut = 10;
 		int count = duration / cut;
 		char scount[10] = { 0 }; char sdur[10] = { 0 };
 		sprintf(sdur, "%d", duration);
@@ -682,6 +689,7 @@ int DealVedio()
 			
 			
 		}
+
 		dectectVideo(&tempVedioWarn, fileInputName,  count);
 		for (int i = 0; i <= count; i++)
 		{
@@ -697,14 +705,14 @@ int DealVedio()
 		
 		UpdateWarnInfo(tempVedioWarn.sYwid);
 		//DeleteFile
-		for (int m = 1; m < 7; m++)
+		/*for (int m = 1; m < 7; m++)
 		{
 			char fileName[200] = { 0 };
 			std::string strXmlName = GetXmlName(m);
 			sprintf(fileName, ("%s/%s_%s.txt"), g_uploadPath.c_str(), tempVedioWarn.sYwid.c_str(), strXmlName.c_str());
 			remove(fileName);
 
-		}
+		}*/
 		
 		remove(OriFileName);
 		return 1;
